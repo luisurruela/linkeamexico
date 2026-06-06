@@ -1,4 +1,3 @@
-// src/components/MiFormulario.tsx
 import React, { type ChangeEvent, type FormEvent, useState } from "react";
 
 interface IFormState {
@@ -7,6 +6,13 @@ interface IFormState {
   phone: string;
   message: string;
 }
+
+// Utility function to parse state elements into x-www-form-urlencoded format
+const encode = (data: Record<string, string>) => {
+  return Object.keys(data)
+    .map((key) => encodeURIComponent(key) + "=" + encodeURIComponent(data[key]))
+    .join("&");
+};
 
 function ContactForm() {
   const [state, setState] = useState<IFormState>({
@@ -18,7 +24,13 @@ function ContactForm() {
 
   const [response, setResponse] = useState<string>("");
   const [buttonTitle, setButtonTitle] = useState<string>("Enviar mensaje");
-  const [buttonDisabled, setButtonDisabled] = useState<boolean>(true);
+
+  // Dynamic evaluation ensures button stays disabled if any field remains blank or contains only whitespace
+  const isButtonDisabled =
+    state.name.trim() === "" ||
+    state.email.trim() === "" ||
+    state.phone.trim() === "" ||
+    state.message.trim() === "";
 
   const handleChange = (event: ChangeEvent<HTMLInputElement>) => {
     const { name, value } = event.target;
@@ -26,8 +38,6 @@ function ContactForm() {
       ...prevState,
       [name]: value,
     }));
-
-    validateForm() ? setButtonDisabled(false) : setButtonDisabled(true);
   };
 
   const handleTextAreaChange = (event: ChangeEvent<HTMLTextAreaElement>) => {
@@ -36,48 +46,32 @@ function ContactForm() {
       ...prevState,
       [name]: value,
     }));
-    validateForm() ? setButtonDisabled(false) : setButtonDisabled(true);
-  };
-
-  const validateForm = () => {
-    return (
-      state.name.trim() !== "" &&
-      state.email.trim() !== "" &&
-      state.phone.trim() !== "" &&
-      state.message.trim() !== ""
-    );
   };
 
   const handleSubmit = async (event: FormEvent) => {
     event.preventDefault();
     setButtonTitle("Enviando...");
-    setButtonDisabled(true);
 
     try {
-      const endpoint = "https://www.linkeamexico.com/blog/wp-json/linkeamexico-api/v1/contact";
-      
-      const response = await fetch(endpoint, {
+      const endpoint = "/";
+
+      // Merge Netlify identifier key with form fields and safely cast type constraints
+      const formData = {
+        "form-name": "contactForm",
+        ...state,
+      } as unknown as Record<string, string>;
+
+      const res = await fetch(endpoint, {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "Accept": "application/json",
-        },
-        body: JSON.stringify({
-          name: state.name,
-          email: state.email,
-          phone: state.phone,
-          message: state.message
-        })
+        headers: { "Content-Type": "application/x-www-form-urlencoded" },
+        body: encode(formData),
       });
 
-      const data = await response.json();
-
-      if (response.ok && data.success) {
+      if (res.ok) {
         showSuccessMessage();
-      }
-      else {
+      } else {
         showErrorMessage();
-        console.error("Error en la respuesta del servidor:", data);
+        console.error("Error en la respuesta de Netlify Forms");
       }
     } catch (error) {
       showErrorMessage();
@@ -87,8 +81,7 @@ function ContactForm() {
 
   const showSuccessMessage = () => {
     resetForm();
-    setButtonDisabled(false);
-    setButtonTitle("Enviar Mensaje");
+    setButtonTitle("Enviar mensaje");
     setResponse("Mensaje enviado correctamente. ¡Gracias!");
 
     setTimeout(() => {
@@ -97,9 +90,7 @@ function ContactForm() {
   };
 
   const showErrorMessage = () => {
-    resetForm();
-    setButtonDisabled(false);
-    setButtonTitle("Enviar Mensaje");
+    setButtonTitle("Enviar mensaje");
     setResponse("Hubo un error al enviar el mensaje. Inténtalo de nuevo.");
 
     setTimeout(() => {
@@ -108,18 +99,21 @@ function ContactForm() {
   };
 
   const resetForm = () => {
-    setState({ name: "", email: "",phone: "", message: "" });
+    setState({ name: "", email: "", phone: "", message: "" });
   };
 
   return (
     <div>
       <form
         id="contactForm"
+        name="contactForm"
         className="px-4 pt-6 pb-8 mb-4"
         onSubmit={handleSubmit}
+        data-netlify="true"
       >
-        {" "}
-        {/* Usamos onSubmit */}
+        {/* Hidden field handles standard HTML crawling and links payload back to this target id */}
+        <input type="hidden" name="form-name" value="contactForm" />
+
         <div className="mb-4">
           <label
             htmlFor="name"
@@ -193,7 +187,7 @@ function ContactForm() {
           <button
             type="submit"
             className="bg-purple-600 hover:bg-purple-800 text-white/95 font-bold cursor-pointer py-2 px-4 focus:outline-none focus:shadow-outline w-full md:w-auto disabled:opacity-50 disabled:cursor-default hover:disabled:bg-purple-600"
-            disabled={buttonDisabled}
+            disabled={isButtonDisabled}
           >
             {buttonTitle}
           </button>
